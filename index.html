@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>OpenCV.js</title>
+	
+	<link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+	<h2>OpenCV.js</h2>
+	<p id="status">OpenCV.js is loading...</p>
+	
+	<div>
+		Choose an image:
+		<input type="file" id="fileInput" name="file" />
+	</div>
+	
+	<table>
+		<tr>
+			<td>
+				<img id="imageSrc" class="img" />
+			</td>
+			<td>
+				<canvas id="canvasOutput1" class="img"></canvas>
+			</td>
+        </tr>
+        <tr>
+			<td>
+				<canvas id="canvasOutput2" class="img"></canvas>
+			</td>
+			<td>
+				<canvas id="canvasOutput3" class="img"></canvas>
+			</td>
+		</tr>
+        <tr>
+			<td>
+				<canvas id="canvasOutput4" class="img"></canvas>
+			</td>
+			<td>
+				<canvas id="canvasOutput5" class="img"></canvas>
+			</td>
+		</tr>
+	</table>
+	
+	<script type="text/javascript">
+	
+		let imgElement = document.getElementById('imageSrc');
+			
+		let inputElement = document.getElementById('fileInput');
+		inputElement.addEventListener('change', (e) => {
+			imgElement.src = URL.createObjectURL(e.target.files[0]);
+		}, false);
+			
+		imgElement.onload = function() {
+		
+			let millisOfAll = (new Date()).getMilliseconds();
+			let millis = millisOfAll;        
+            
+			let src = cv.imread(imgElement);
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.threshold(src, src, 120, 200, cv.THRESH_BINARY);
+            
+            let canvasOutputName;
+            let noOfContoursToDraw;
+            let lineThickness = 1.3;
+            let target;
+
+            canvasOutputName = 'canvasOutput1';
+            noOfContoursToDraw = -1;
+            target = cv.Mat.zeros(src.rows, src.cols, cv.CV_8UC3);
+            drawContoursWithRandomScalar(src, target, noOfContoursToDraw, lineThickness, canvasOutputName);
+            millis = logOperationTime("creating " + canvasOutputName, millis);
+
+            canvasOutputName = 'canvasOutput2';
+            noOfContoursToDraw = -1;
+            target = src.clone();
+            drawContoursWithRandomScalar(src, target, noOfContoursToDraw, lineThickness, canvasOutputName);
+            millis = logOperationTime("creating " + canvasOutputName, millis);
+
+            canvasOutputName = 'canvasOutput3';
+            noOfContoursToDraw = 30;
+            target = cv.Mat.zeros(src.rows, src.cols, cv.CV_8UC3);
+            drawContoursWithRandomScalar(src, target, noOfContoursToDraw, lineThickness, canvasOutputName);
+            millis = logOperationTime("creating " + canvasOutputName, millis);
+            
+			src.delete();            
+            millis = logOperationTime("\n executing whole code", millisOfAll);
+            console.log("\n");
+        }
+
+        function showGradients() {
+            let output1 = new cv.Mat();
+			cv.Scharr(src, output1, cv.CV_8U, 0, 1, 1, 0, cv.BORDER_DEFAULT);
+			// cv.Sobel(src, output1, cv.CV_8U, 0, 1, 3, 1, 0, cv.BORDER_DEFAULT);
+            cv.imshow('canvasOutput1', output1);
+            millis = logOperationTime("creating output1", millis);
+
+			let output2 = analyseGradientsAndPrintGreaterThan(0.3, output1);
+			cv.imshow('canvasOutput2', output2);
+			millis = logOperationTime("creating output2", millis);
+
+            let output3 = analyseGradientsAndPrintGreaterThan(0.7, output1);
+            cv.imshow('canvasOutput3', output3);
+            millis = logOperationTime("creating output3", millis);
+			
+			let output4 = new cv.Mat();
+			cv.Scharr(output1, output4, cv.CV_8U, 0, 1, 1, 0, cv.BORDER_DEFAULT);
+            cv.imshow('canvasOutput4', output4);
+            millis = logOperationTime("creating output4", millis);
+
+            let output5 = analyseGradientsAndPrintGreaterThan(0.9, output1);
+            cv.imshow('canvasOutput5', output5);
+            millis = logOperationTime("creating output5", millis);
+			
+			src.delete();
+			output1.delete();
+			output2.delete();
+			output3.delete();
+			output4.delete();
+			output5.delete();
+        }
+		
+	</script>
+	<script src="my.js" type="text/javascript"></script>
+	<script async src="opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+</body>
+</html>
