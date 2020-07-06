@@ -8,7 +8,9 @@ function logOperationTime(operationName, millisSinceLastOp) {
     let now = (new Date()).getMilliseconds();
     let operationDuration = now - millisSinceLastOp;
 
-    console.log(operationName + " took " + operationDuration + "ms");
+    if (operationDuration >= 0) {
+        console.log(operationName + " took " + operationDuration + "ms");
+    }
     return now;
 }
 
@@ -74,8 +76,107 @@ function analyseGradientsAndPrintGreaterThan(threshold, imgInput) {
         allUsedColorsCounter.set(allUsedColors.get(color), color);
     }
         
-    console.log(allUsedColorsCounter);
+    //console.log(allUsedColorsCounter);
     return gradientOutput;
+}
+
+function drawContoursWithRandomScalar(src, target, percentOfContoursToDraw, lineThickness, canvasOutputName) {
+    let contours = findContours(src);
+    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw);
+
+    // draw contours with random Scalar
+    let contourFillCounter = 0;
+    for (let i = 0; i < contours.size(); i++) {
+        let contourLength = contours.get(i).data.length;
+        if (contourLength <= contourMaxLength) {
+            continue;
+        }
+        let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255), Math.round(Math.random() * 255));
+        cv.drawContours(target, contours, i, color, lineThickness, cv.LINE_8); // , hierarchy, 100);
+        contourFillCounter++;
+    }
+    console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");
+    
+    cv.imshow(canvasOutputName, target);
+
+    target.delete();
+}
+
+function findContours(src) {
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+    return contours;
+}
+
+function determineContoursMaxLength(contours, percentOfContoursToDraw) {
+    let noOfContoursToFind;
+
+    if (percentOfContoursToDraw == 0) {
+        noOfContoursToFind = 0;
+    }
+    else {
+        noOfContoursToFind = Math.min(60, contours.size() * percentOfContoursToDraw);
+    }
+
+    let contourMaxLength = detectMaxLengthForNumberOfContours(contours, noOfContoursToFind);
+    return contourMaxLength;
+}
+
+async function drawContoursInnerArea(src, target, percentOfContoursToDraw, lineThickness, canvasOutputName) {
+    let contours = findContours(src);
+    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw);
+
+    // draw contours with random Scalar
+    let contourFillCounter = 0;
+    for (let i = 0; i < contours.size(); i++) {
+        let contourData = contours.get(i).data32S;
+        let contourLength = contourData.length;
+        if (contourLength <= contourMaxLength) {
+            continue;
+        }
+        
+        console.log(contourData);
+
+        let R = Math.round(Math.random() * 255);
+        let G = Math.round(Math.random() * 255);
+        let B = Math.round(Math.random() * 255);
+        let A = Math.round(Math.random() * 255);
+
+        let x, y;
+        
+        for (let j = 0; j <= contourData.length - 2; j=j+2) {
+            y = contourData[j];
+            x = contourData[j + 1];
+
+            //console.log(x + "," + y);
+
+            target.ucharPtr( 1*x , 1*y )[0] = R;
+            target.ucharPtr( 1*x , 1*y )[1] = G;
+            target.ucharPtr( 1*x , 1*y )[2] = B;
+            target.ucharPtr( 1*x , 1*y )[3] = A;
+
+            // console.log("contours.get(0).rows:" + contours.get(0).rows);
+            // console.log("contours.get(0).data:" + contours.get(0).data);
+
+            // for (let i = 0; i < contours.get(0).rows; i++) {
+            //     let startPoint = new cv.Point(contours.get(0).data32S[i * 4], contours.get(0).data32S[i * 4 + 1]);
+            //     let endPoint = new cv.Point(contours.get(0).data32S[i * 4 + 2], contours.get(0).data32S[i * 4 + 3]);
+            //     contourFillCounter++;
+            // }
+        }
+ 
+        //cv.drawContours(target, contours, i, color, lineThickness, cv.LINE_8);
+        contourFillCounter++;
+        
+        console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");
+        
+        cv.imshow(canvasOutputName, target);
+
+        await sleep(200);
+    }
+
+    target.delete();
 }
 
 function detectMaxLengthForNumberOfContours(contours, noOfGreatContoursToFind) {
@@ -130,27 +231,6 @@ function calcContourLengthHistogram(contours) {
     return contourLengthCount;
 }
 
-function drawContoursWithRandomScalar(src, target, noOfContoursToFind, lineThickness, canvasOutputName) {
-    let contours = new cv.MatVector();
-    let hierarchy = new cv.Mat();
-    cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
-
-    let contourMaxLength = detectMaxLengthForNumberOfContours(contours, noOfContoursToFind);
-
-    // draw contours with random Scalar
-    let contourFillCounter = 0;
-    for (let i = 0; i < contours.size(); i++) {
-        let contourLength = contours.get(i).data.length;
-        if (contourLength <= contourMaxLength) {
-            continue;
-        }
-        let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255), Math.round(Math.random() * 255));
-        cv.drawContours(target, contours, i, color, lineThickness, cv.LINE_8); // , hierarchy, 100);
-        contourFillCounter++;
-    }
-    console.log(contourFillCounter + " contours were drawn");
-    
-    cv.imshow(canvasOutputName, target);
-
-    target.delete();
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
