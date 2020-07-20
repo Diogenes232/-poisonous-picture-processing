@@ -80,9 +80,9 @@ function analyseGradientsAndPrintGreaterThan(threshold, imgInput) {
     return gradientOutput;
 }
 
-function drawContoursWithRandomScalar(src, target, percentOfContoursToDraw, lineThickness, canvasOutputName) {
+function drawContoursWithRandomScalar(src, target, percentOfContoursToDraw, maxNumberOfContours, lineThickness, canvasOutputName) {
     let contours = findContours(src);
-    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw);
+    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw, maxNumberOfContours);
 
     // draw contours with random Scalar
     let contourFillCounter = 0;
@@ -91,14 +91,15 @@ function drawContoursWithRandomScalar(src, target, percentOfContoursToDraw, line
         if (contourLength <= contourMaxLength) {
             continue;
         }
+
         let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255), Math.round(Math.random() * 255));
         cv.drawContours(target, contours, i, color, lineThickness, cv.LINE_8); // , hierarchy, 100);
+        
         contourFillCounter++;
     }
-    console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");
-    
-    cv.imshow(canvasOutputName, target);
 
+    console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");    
+    cv.imshow(canvasOutputName, target);
     target.delete();
 }
 
@@ -109,25 +110,27 @@ function findContours(src) {
     return contours;
 }
 
-function determineContoursMaxLength(contours, percentOfContoursToDraw) {
+function determineContoursMaxLength(contours, percentOfContoursToDraw, maxNumberOfContours) {
     let noOfContoursToFind;
 
     if (percentOfContoursToDraw == 0) {
         noOfContoursToFind = 0;
     }
+    else if (maxNumberOfContours == 0 && percentOfContoursToDraw == 1.0) {
+        noOfContoursToFind = contours.size() * percentOfContoursToDraw;
+    }
     else {
-        noOfContoursToFind = Math.min(60, contours.size() * percentOfContoursToDraw);
+        noOfContoursToFind = Math.min(maxNumberOfContours, contours.size() * percentOfContoursToDraw);
     }
 
     let contourMaxLength = detectMaxLengthForNumberOfContours(contours, noOfContoursToFind);
     return contourMaxLength;
 }
 
-async function drawContoursInnerArea(src, target, percentOfContoursToDraw, lineThickness, canvasOutputName) {
+async function drawContoursInnerArea(src, target, percentOfContoursToDraw, maxNumberOfContours, lineThickness, canvasOutputName) {
     let contours = findContours(src);
-    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw);
+    let contourMaxLength = determineContoursMaxLength(contours, percentOfContoursToDraw, maxNumberOfContours);
 
-    // draw contours with random Scalar
     let contourFillCounter = 0;
     for (let i = 0; i < contours.size(); i++) {
         let contourData = contours.get(i).data32S;
@@ -135,48 +138,46 @@ async function drawContoursInnerArea(src, target, percentOfContoursToDraw, lineT
         if (contourLength <= contourMaxLength) {
             continue;
         }
-        
-        console.log(contourData);
 
-        let R = Math.round(Math.random() * 255);
-        let G = Math.round(Math.random() * 255);
-        let B = Math.round(Math.random() * 255);
-        let A = Math.round(Math.random() * 255);
-
-        let x, y;
-        
-        for (let j = 0; j <= contourData.length - 2; j=j+2) {
-            y = contourData[j];
-            x = contourData[j + 1];
-
-            //console.log(x + "," + y);
-
-            target.ucharPtr( 1*x , 1*y )[0] = R;
-            target.ucharPtr( 1*x , 1*y )[1] = G;
-            target.ucharPtr( 1*x , 1*y )[2] = B;
-            target.ucharPtr( 1*x , 1*y )[3] = A;
-
-            // console.log("contours.get(0).rows:" + contours.get(0).rows);
-            // console.log("contours.get(0).data:" + contours.get(0).data);
-
-            // for (let i = 0; i < contours.get(0).rows; i++) {
-            //     let startPoint = new cv.Point(contours.get(0).data32S[i * 4], contours.get(0).data32S[i * 4 + 1]);
-            //     let endPoint = new cv.Point(contours.get(0).data32S[i * 4 + 2], contours.get(0).data32S[i * 4 + 3]);
-            //     contourFillCounter++;
-            // }
-        }
+        await drawContour(contourData, target, lineThickness, canvasOutputName);
  
-        //cv.drawContours(target, contours, i, color, lineThickness, cv.LINE_8);
-        contourFillCounter++;
-        
-        console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");
-        
+        contourFillCounter++;        
         cv.imshow(canvasOutputName, target);
-
         await sleep(200);
     }
 
+    console.log(contourFillCounter + " contours drawn (" + contours.size() + " detected)");
     target.delete();
+}
+
+async function drawContour(contourData, target, lineThickness, canvasOutputName) {
+    let R = Math.round(Math.random() * 255);
+    let G = Math.round(Math.random() * 255);
+    let B = Math.round(Math.random() * 255);
+    let A = Math.round(Math.random() * 255);
+
+    let x, y, color,
+        x_next, y_next;
+
+    for (let j = 0; j <= contourData.length - 2; j = j + 2) {
+        x = contourData[j + 1];
+        y = contourData[j];
+
+        target.ucharPtr(x, y)[0] = R;
+        target.ucharPtr(x, y)[1] = G;
+        target.ucharPtr(x, y)[2] = B;
+        target.ucharPtr(x, y)[3] = A;
+        color = new cv.Scalar(R, G, B);
+
+        x_next = contourData[(j + 1 + 2) % contourData.length];
+        y_next = contourData[(j + 2) % contourData.length];
+        cv.line(target, new cv.Point(y, x), new cv.Point(y_next, x_next), color, lineThickness);
+
+        if (j % 7 == 0) {
+            await sleep(1);
+            cv.imshow(canvasOutputName, target);
+        }
+    }
 }
 
 function detectMaxLengthForNumberOfContours(contours, noOfGreatContoursToFind) {
